@@ -55,7 +55,7 @@ start_lon = st.sidebar.number_input("Longitude Awal (°)", min_value=-180.0, max
 # Koordinat Titik Akhir
 st.sidebar.subheader("Koordinat Titik Akhir")
 end_lat = st.sidebar.number_input("Latitude Akhir (°)", min_value=-90.0, max_value=90.0, value=35.50000)
-end_lon = st.sidebar.number_input("Longitude Akhir (°)", min_value=-180.0, max_value=180.0, value=100.00000)
+end_lon = st.sidebar.number_input("Longitude Akhir (°)", min_value=-180. max_value=180.0, value=100.00000)
 
 # Tombol Hitung
 if st.sidebar.button("Hitung"):
@@ -109,22 +109,12 @@ if st.sidebar.button("Hitung"):
         width_min_pixels=2,
     )
 
-    # Map dengan efek Elevasi 3D
-    terrain_layer = pdk.Layer(
-        "TerrainLayer",
-        data=[],
-        elevation_scale=50,  # Skala elevasi untuk efek 3D
-        get_position="[longitude, latitude]",
-        get_elevation=0,
-        pickable=True
-    )
-
-    # Globe Map View dengan elevasi 3D
+    # Globe Map View dengan efek Elevasi 3D
     view_state = pdk.ViewState(latitude=(start_lat + end_lat) / 2, longitude=(start_lon + end_lon) / 2, zoom=2, pitch=60)
 
     # Pydeck Map
     r = pdk.Deck(
-        layers=[point_layer, pin_layer, path_layer, terrain_layer],
+        layers=[point_layer, pin_layer, path_layer],
         initial_view_state=view_state,
         map_style="mapbox://styles/mapbox/satellite-v9",
         tooltip={"text": "{name}\nKoordinat: {latitude:.4f}, {longitude:.4f}\nAzimuth: {azimuth:.2f}°"}
