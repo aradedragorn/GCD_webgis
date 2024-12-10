@@ -55,7 +55,7 @@ start_lon = st.sidebar.number_input("Longitude Awal (°)", min_value=-180.0, max
 # Koordinat Titik Akhir
 st.sidebar.subheader("Koordinat Titik Akhir")
 end_lat = st.sidebar.number_input("Latitude Akhir (°)", min_value=-90.0, max_value=90.0, value=35.50000)
-end_lon = st.sidebar.number_input("Longitude Akhir (°)", min_value=-180. max_value=180.0, value=100.00000)
+end_lon = st.sidebar.number_input("Longitude Akhir (°)", min_value=-180.0, max_value=180.0, value=100.00000)
 
 # Tombol Hitung
 if st.sidebar.button("Hitung"):
