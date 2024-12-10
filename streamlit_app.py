@@ -88,3 +88,25 @@ if st.sidebar.button("Hitung"):
     st.write(f"Jarak antara titik awal dan akhir adalah: {distance:.5f} km")
     st.write(f"Sudut berangkat: {azimuth_depart:.5f}°")
     st.write(f"Sudut pulang: {azimuth_return:.5f}°")
+
+    # Membuat peta
+    m = folium.Map(location=[(start_lat + end_lat) / 2, (start_lon + end_lon) / 2], zoom_start=3)
+
+    # Menambahkan marker untuk titik awal dan akhir dengan simbol yang berbeda
+    folium.Marker(
+        [start_lat, start_lon],
+        popup=f'Titik Awal\nLintang: {start_lat:.5f}°, Bujur: {start_lon:.5f}°',
+        icon=folium.Icon(color='green', icon='info-sign')
+    ).add_to(m)
+
+    folium.Marker(
+        [end_lat, end_lon],
+        popup=f'Titik Akhir\nLintang: {end_lat:.5f}°, Bujur: {end_lon:.5f}°',
+        icon=folium.Icon(color='red', icon='info-sign')
+    ).add_to(m)
+
+    # Menambahkan lintasan ke peta
+    folium.PolyLine(path, color='red', weight=2.5, opacity=1).add_to(m)
+
+    # Menampilkan peta di Streamlit
+    st_folium(m, width=800, height=500)
