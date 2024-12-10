@@ -13,7 +13,7 @@ def calculate_great_circle_path(lat1, lon1, lat2, lon2, segments=100):
     for i in range(segments + 1):
         s = g.s13 * i / segments
         pos = g.Position(s)
-        path.append({"latitude": pos['lat2'], "longitude": pos['lon2']})
+        path.append([pos['lon2'], pos['lat2']])
     return path
 
 @st.cache_data
@@ -88,15 +88,14 @@ if st.sidebar.button("Hitung"):
         pickable=True,
     )
 
-    # Layer Lintasan (Arc)
-    arc_layer = pdk.Layer(
-        "ArcLayer",
-        data=path,
-        get_source_position="[longitude, latitude]",
-        get_target_position="[longitude, latitude]",
-        get_width=5,
-        get_source_color=[0, 255, 0],
-        get_target_color=[0, 0, 255],
+    # Layer Lintasan (Path)
+    path_layer = pdk.Layer(
+        "PathLayer",
+        data=[{"path": path}],
+        get_path="path",
+        get_width=3,
+        get_color=[0, 255, 0],
+        width_min_pixels=2,
     )
 
     # Globe Map View
@@ -104,7 +103,7 @@ if st.sidebar.button("Hitung"):
 
     # Pydeck Map
     r = pdk.Deck(
-        layers=[point_layer, arc_layer],
+        layers=[point_layer, path_layer],
         initial_view_state=view_state,
         map_style="mapbox://styles/mapbox/satellite-v9",
         tooltip={"text": "{name}"}
