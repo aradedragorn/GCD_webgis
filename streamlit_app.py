@@ -1,6 +1,4 @@
 import streamlit as st
-import folium
-from streamlit_folium import st_folium
 from geographiclib.geodesic import Geodesic
 from geopy.geocoders import Nominatim
 import math  # Import the math module
@@ -25,15 +23,9 @@ def calculate_great_circle_distance(lat1, lon1, lat2, lon2):
     g = geod.Inverse(lat1, lon1, lat2, lon2)
     return g['s12'] / 1000  # dalam kilometer
 
-@st.cache_data
-def calculate_azimuth(lat1, lon1, lat2, lon2):
-    geod = Geodesic.WGS84
-    g = geod.Inverse(lat1, lon1, lat2, lon2)
-    return g['azi1']  # Mengembalikan azimuth berangkat saja
-
 # Tampilan aplikasi Streamlit
 st.title("WebGIS Interaktif: Great Circle Distance (GCD)")
-st.markdown("Masukkan koordinat dalam format desimal untuk melihat lintasan besar dan jarak di peta.")
+st.markdown("Masukkan koordinat dalam format desimal untuk melihat jarak dan lintasan di peta.")
 
 # Input pencarian lokasi
 st.sidebar.header("Cari Lokasi")
@@ -44,7 +36,6 @@ geolocator = Nominatim(user_agent="webgis_app")  # Buat user agent unik
 
 if location:
     try:
-        # Menggunakan geopy untuk mencari lokasi
         loc = geolocator.geocode(location)
         if loc:
             st.sidebar.write(f"Koordinat untuk '{location}':")
@@ -70,61 +61,30 @@ st.sidebar.subheader("Koordinat Titik Akhir")
 end_lat = st.sidebar.number_input("Latitude (°)", min_value=-90.0, max_value=90.0, value=35.50000)
 end_lon = st.sidebar.number_input("Longitude (°)", min_value=-180.0, max_value=180.0, value=100.00000)
 
-# Menggunakan session state untuk menjaga status kalkulasi
-if "calculate" not in st.session_state:
-    st.session_state.calculate = False
-
 # Button untuk menghitung
 if st.sidebar.button("Hitung"):
-    st.session_state.calculate = True
-
-# Menampilkan hasil perhitungan dan peta hanya jika tombol "Hitung" ditekan
-if st.session_state.calculate:
-    # Menghitung lintasan besar, jarak, dan azimuth
+    # Menghitung lintasan besar dan jarak
     path = calculate_great_circle_path(start_lat, start_lon, end_lat, end_lon)
     distance = calculate_great_circle_distance(start_lat, start_lon, end_lat, end_lon)
 
-    # Menghitung azimuth ber angkat dan azimuth pulang
-    lat1, lon1 = start_lat, start_lon
-    lat2, lon2 = end_lat, end_lon
+    # Menghitung azimuth berangkat dan pulang
+    d_lon = math.radians(end_lon - start_lon)
 
-    d_lon = math.radians(lon2 - lon1)
+    start_lat, start_lon, end_lat, end_lon = map(math.radians, [start_lat, start_lon, end_lat, end_lon])
 
-    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+    y_depart = math.sin(d_lon) * math.cos(end_lat)
+    x_depart = math.cos(start_lat) * math.sin(end_lat) - math.sin(start_lat) * math.cos(end_lat) * math.cos(d_lon)
+    azimuth_depart = math.degrees(math.atan2(y_depart, x_depart))
 
-    y = math.sin(d_lon) * math.cos(lat2)
-    x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(d_lon)
+    y_return = math.sin(-d_lon) * math.cos(start_lat)
+    x_return = math.cos(end_lat) * math.sin(start_lat) - math.sin(end_lat) * math.cos(start_lat) * math.cos(-d_lon)
+    azimuth_return = math.degrees(math.atan2(y_return, x_return))
 
-    azimuth_depart = math.degrees(math.atan2(y, x))
-
-    y = math.sin(d_lon) * math.cos(lat1)
-    x = math.cos(lat2) * math.sin(lat1) - math.sin(lat2) * math.cos(lat1) * math.cos(d_lon)
-
-    azimuth_return = math.degrees(math.atan2(y, x))
+    # Konversi sudut negatif ke rentang 0–360°
+    azimuth_depart = (azimuth_depart + 360) % 360
+    azimuth_return = (azimuth_return + 360) % 360
 
     # Menampilkan hasil
     st.write(f"Jarak antara titik awal dan akhir adalah: {distance:.5f} km")
     st.write(f"Sudut berangkat: {azimuth_depart:.5f}°")
     st.write(f"Sudut pulang: {azimuth_return:.5f}°")
-
-    # Membuat peta
-    m = folium.Map(location=[(start_lat + end_lat) / 2, (start_lon + end_lon) / 2], zoom_start=3)
-
-    # Menambahkan marker untuk titik awal dan akhir dengan simbol yang berbeda
-    folium.Marker(
-        [start_lat, start_lon],
-        popup=f'Titik Awal\nLintang: {start_lat:.5f}°, Bujur: {start_lon:.5f}°',
-        icon=folium.Icon(color='green', icon='info-sign')
-    ).add_to(m)
-
-    folium.Marker(
-        [end_lat, end_lon],
-        popup=f'Titik Akhir\nLintang: {end_lat:.5f}°, Bujur: {end_lon:.5f}°',
-        icon=folium.Icon(color='red', icon='info-sign')
-    ).add_to(m)
-
-    # Menambahkan lintasan ke peta
-    folium.PolyLine(path, color='red', weight=2.5, opacity=1).add_to(m)
-
-    # Menampilkan peta di Streamlit
-    st_folium(m, width=800, height=500)
