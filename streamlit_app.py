@@ -1,24 +1,20 @@
-pip install folium streamlit_folium geographiclib geopy
 import streamlit as st
-import folium
-from streamlit_folium import st_folium
 from geographiclib.geodesic import Geodesic
 from geopy.geocoders import Nominatim
-import math  # Import the math module
+import pandas as pd
 
 # Fungsi untuk menghitung lintasan besar
 @st.cache_data
-def calculate_great_circle_path(lat1, lon1, lat2, lon2):
+def calculate_great_circle_path(lat1, lon1, lat2, lon2, num_points=100):
     path = []
     geod = Geodesic.WGS84
     g = geod.InverseLine(lat1, lon1, lat2, lon2)
-    ds = 1000e3  # Segment size: 1000 km
-    n = int(g.s13 / ds) + 1
-    for i in range(n + 1):
-        s = min(ds * i, g.s13)
+    ds = g.s13 / num_points  # Segment size
+    for i in range(num_points + 1):
+        s = ds * i
         point = g.Position(s)
-        path.append((point['lat2'], point['lon2']))
-    return path
+        path.append({"latitude": point['lat2'], "longitude": point['lon2']})
+    return pd.DataFrame(path)
 
 @st.cache_data
 def calculate_great_circle_distance(lat1, lon1, lat2, lon2):
@@ -65,30 +61,11 @@ end_lon = st.sidebar.number_input("Longitude (°)", min_value=-180.0, max_value=
 # Tombol untuk memulai kalkulasi
 if st.sidebar.button("Hitung"):
     # Menghitung lintasan besar dan jarak
-    path = calculate_great_circle_path(start_lat, start_lon, end_lat, end_lon)
+    path_df = calculate_great_circle_path(start_lat, start_lon, end_lat, end_lon)
     distance = calculate_great_circle_distance(start_lat, start_lon, end_lat, end_lon)
-    
+
     # Menampilkan hasil
     st.write(f"Jarak antara titik awal dan akhir adalah: {distance:.5f} km")
-    
-    # Membuat peta
-    m = folium.Map(location=[(start_lat + end_lat) / 2, (start_lon + end_lon) / 2], zoom_start=3)
 
-    # Menambahkan marker untuk titik awal dan akhir
-    folium.Marker(
-        [start_lat, start_lon],
-        popup=f'Titik Awal\nLintang: {start_lat:.5f}°, Bujur: {start_lon:.5f}°',
-        icon=folium.Icon(color='green', icon='info-sign')
-    ).add_to(m)
-
-    folium.Marker(
-        [end_lat, end_lon],
-        popup=f'Titik Akhir\nLintang: {end_lat:.5f}°, Bujur: {end_lon:.5f}°',
-        icon=folium.Icon(color='red', icon='info-sign')
-    ).add_to(m)
-
-    # Menambahkan lintasan ke peta
-    folium.PolyLine(path, color='blue', weight=2.5, opacity=1).add_to(m)
-
-    # Menampilkan peta di Streamlit
-    st_folium(m, width=800, height=500)
+    # Menampilkan lintasan di peta menggunakan Streamlit Maps
+    st.map(path_df)
