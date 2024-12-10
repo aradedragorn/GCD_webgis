@@ -1,3 +1,4 @@
+pip install folium streamlit_folium geographiclib geopy
 import streamlit as st
 import folium
 from streamlit_folium import st_folium
