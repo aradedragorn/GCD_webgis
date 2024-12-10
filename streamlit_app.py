@@ -74,8 +74,8 @@ if st.sidebar.button("Hitung"):
 
     # Data untuk Pydeck
     points = [
-        {"latitude": start_lat, "longitude": start_lon, "name": "Titik Awal"},
-        {"latitude": end_lat, "longitude": end_lon, "name": "Titik Akhir"}
+        {"latitude": start_lat, "longitude": start_lon, "name": "Titik Awal", "azimuth": azimuth_depart},
+        {"latitude": end_lat, "longitude": end_lon, "name": "Titik Akhir", "azimuth": azimuth_return}
     ]
 
     # Layer Titik (Marker)
@@ -86,6 +86,17 @@ if st.sidebar.button("Hitung"):
         get_fill_color=[255, 0, 0, 160],
         get_radius=50000,
         pickable=True,
+    )
+
+    # Menambahkan simbol pin untuk titik awal dan akhir
+    pin_layer = pdk.Layer(
+        "IconLayer",
+        data=points,
+        get_position="[longitude, latitude]",
+        get_icon_size=5,
+        get_icon_anchor=[0.5, 1],
+        icon_data={"url": "https://raw.githubusercontent.com/visgl/deck.gl-data/master/website/icon-location.svg"},
+        pickable=True
     )
 
     # Layer Lintasan (Path)
@@ -103,10 +114,10 @@ if st.sidebar.button("Hitung"):
 
     # Pydeck Map
     r = pdk.Deck(
-        layers=[point_layer, path_layer],
+        layers=[point_layer, pin_layer, path_layer],
         initial_view_state=view_state,
         map_style="mapbox://styles/mapbox/satellite-v9",
-        tooltip={"text": "{name}"}
+        tooltip={"text": "{name}\nKoordinat: {latitude:.4f}, {longitude:.4f}\nAzimuth: {azimuth:.2f}°"}
     )
 
     # Tampilkan peta
