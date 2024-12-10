@@ -1,28 +1,50 @@
 import streamlit as st
+import folium
+from streamlit_folium import st_folium
 from geographiclib.geodesic import Geodesic
 from geopy.geocoders import Nominatim
 import math  # Import the math module
 
 # Fungsi untuk menghitung lintasan besar
 @st.cache_data
+def calculate_great_circle_path(lat1, lon1, lat2, lon2):
+    path = []
+    geod = Geodesic.WGS84
+    g = geod.InverseLine(lat1, lon1, lat2, lon2)
+    ds = 1000e3  # Segment size: 1000 km
+    n = int(g.s13 / ds) + 1
+    for i in range(n + 1):
+        s = min(ds * i, g.s13)
+        point = g.Position(s)
+        path.append((point['lat2'], point['lon2']))
+    return path
+
+@st.cache_data
 def calculate_great_circle_distance(lat1, lon1, lat2, lon2):
     geod = Geodesic.WGS84
     g = geod.Inverse(lat1, lon1, lat2, lon2)
     return g['s12'] / 1000  # dalam kilometer
 
+@st.cache_data
+def calculate_azimuth(lat1, lon1, lat2, lon2):
+    geod = Geodesic.WGS84
+    g = geod.Inverse(lat1, lon1, lat2, lon2)
+    return g['azi1']  # Mengembalikan azimuth berangkat saja
+
 # Tampilan aplikasi Streamlit
 st.title("WebGIS Interaktif: Great Circle Distance (GCD)")
-st.markdown("Masukkan koordinat dalam format desimal untuk menghitung jarak dan sudut.")
+st.markdown("Masukkan koordinat dalam format desimal untuk melihat jarak dan lintasan di peta.")
 
 # Input pencarian lokasi
 st.sidebar.header("Cari Lokasi")
-location = st.sidebar.text_input("Masukkan lokasi:", value="")  # Default input kosong
+location = st.sidebar.text_input("Masukkan lokasi:", value="")  # Set a default empty string
 
 # Inisialisasi geolocator
-geolocator = Nominatim(user_agent="webgis_app")  # User agent unik
+geolocator = Nominatim(user_agent="webgis_app")  # Buat user agent unik
 
 if location:
     try:
+        # Menggunakan geopy untuk mencari lokasi
         loc = geolocator.geocode(location)
         if loc:
             st.sidebar.write(f"Koordinat untuk '{location}':")
@@ -31,7 +53,7 @@ if location:
             st.sidebar.write(f"Lintang: {lat_decimal:.4f}°")
             st.sidebar.write(f"Bujur: {lon_decimal:.4f}°")
         else:
-            st.sidebar.error("Lokasi tidak ditemukan. Coba gunakan nama tempat yang lebih spesifik.")
+            st.sidebar.error("Lokasi tidak ditemukan. Coba periksa ejaan atau gunakan nama tempat yang lebih spesifik.")
     except Exception as e:
         st.sidebar.error(f"Terjadi kesalahan saat mencari lokasi: {e}")
 
@@ -48,35 +70,42 @@ st.sidebar.subheader("Koordinat Titik Akhir")
 end_lat = st.sidebar.number_input("Latitude (°)", min_value=-90.0, max_value=90.0, value=35.50000)
 end_lon = st.sidebar.number_input("Longitude (°)", min_value=-180.0, max_value=180.0, value=100.00000)
 
+# Menggunakan session state untuk menjaga status kalkulasi
+if "calculate" not in st.session_state:
+    st.session_state.calculate = False
+
 # Button untuk menghitung
 if st.sidebar.button("Hitung"):
-    # Menghitung jarak lintasan besar
+    st.session_state.calculate = True
+
+# Menampilkan hasil perhitungan dan peta hanya jika tombol "Hitung" ditekan
+if st.session_state.calculate:
+    # Menghitung lintasan besar, jarak, dan azimuth
+    path = calculate_great_circle_path(start_lat, start_lon, end_lat, end_lon)
     distance = calculate_great_circle_distance(start_lat, start_lon, end_lat, end_lon)
 
-    # Menghitung azimuth berangkat dan pulang
-    d_lon = math.radians(end_lon - start_lon)
+    # Menghitung azimuth ber angkat dan azimuth pulang
+    lat1, lon1 = start_lat, start_lon
+    lat2, lon2 = end_lat, end_lon
 
-    start_lat, start_lon, end_lat, end_lon = map(math.radians, [start_lat, start_lon, end_lat, end_lon])
+    d_lon = math.radians(lon2 - lon1)
 
-    # Sudut berangkat
-    y_depart = math.sin(d_lon) * math.cos(end_lat)
-    x_depart = math.cos(start_lat) * math.sin(end_lat) - math.sin(start_lat) * math.cos(end_lat) * math.cos(d_lon)
-    azimuth_depart = math.degrees(math.atan2(y_depart, x_depart))
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
 
-    # Sudut pulang
-    y_return = math.sin(-d_lon) * math.cos(start_lat)
-    x_return = math.cos(end_lat) * math.sin(start_lat) - math.sin(end_lat) * math.cos(start_lat) * math.cos(-d_lon)
-    azimuth_return = math.degrees(math.atan2(y_return, x_return))
+    y = math.sin(d_lon) * math.cos(lat2)
+    x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(d_lon)
 
-    # Konversi sudut ke rentang positif 0–360°
-    azimuth_depart = (azimuth_depart + 360) % 360
-    azimuth_return = (azimuth_return + 360) % 360
+    azimuth_depart = math.degrees(math.atan2(y, x))
+
+    y = math.sin(d_lon) * math.cos(lat1)
+    x = math.cos(lat2) * math.sin(lat1) - math.sin(lat2) * math.cos(lat1) * math.cos(d_lon)
+
+    azimuth_return = math.degrees(math.atan2(y, x))
 
     # Menampilkan hasil
-    st.write(f"Jarak antara titik awal dan akhir adalah: **{distance:.5f} km**")
-    st.write(f"Sudut berangkat: **{azimuth_depart:.5f}°**")
-    st.write(f"Sudut pulang: **{azimuth_return:.5f}°**")
-
+    st.write(f"Jarak antara titik awal dan akhir adalah: {distance:.5f} km")
+    st.write(f"Sudut berangkat: {azimuth_depart:.5f}°")
+    st.write(f"Sudut pulang: {azimuth_return:.5f}°")
 
     # Membuat peta
     m = folium.Map(location=[(start_lat + end_lat) / 2, (start_lon + end_lon) / 2], zoom_start=3)
