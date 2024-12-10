@@ -127,7 +127,7 @@ if st.sidebar.button("Hitung"):
         layers=[point_layer, pin_layer, path_layer, terrain_layer],
         initial_view_state=view_state,
         map_style="mapbox://styles/mapbox/satellite-v9",
-        tooltip={"text": "{name}\nKoordinat: {latitude:.4f}, {longitude:.4f}\nAzimuth: {azimuth:.2f}°"}
+        tooltip={"text": "{name}\nKoordinat: {latitude:.4f}°, {longitude:.4f}°\nAzimuth: {azimuth:.2f}°"}
     )
 
     # Tampilkan peta
