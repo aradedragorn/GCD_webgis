@@ -1,98 +1,134 @@
 import streamlit as st
 import pydeck as pdk
-import math
+from geographiclib.geodesic import Geodesic
 from geopy.geocoders import Nominatim
+import math
 
-# Fungsi untuk mencari lokasi dengan geopy
-def get_coordinates(location):
-    geolocator = Nominatim(user_agent="webgis_app")
-    loc = geolocator.geocode(location)
-    if loc:
-        return loc.latitude, loc.longitude
-    return None, None
+# Fungsi untuk menghitung lintasan besar
+@st.cache_data
+def calculate_great_circle_path(lat1, lon1, lat2, lon2, segments=100):
+    path = []
+    geod = Geodesic.WGS84
+    g = geod.InverseLine(lat1, lon1, lat2, lon2)
+    for i in range(segments + 1):
+        s = g.s13 * i / segments
+        pos = g.Position(s)
+        path.append([pos['lon2'], pos['lat2']])
+    return path
 
-# Judul aplikasi
-st.title("Globe 3D Interaktif dengan Pydeck dan Mapbox")
+@st.cache_data
+def calculate_great_circle_distance(lat1, lon1, lat2, lon2):
+    geod = Geodesic.WGS84
+    g = geod.Inverse(lat1, lon1, lat2, lon2)
+    return g['s12'] / 1000  # dalam kilometer
 
-# Kolom untuk mencari lokasi
+@st.cache_data
+def calculate_azimuth(lat1, lon1, lat2, lon2):
+    geod = Geodesic.WGS84
+    g = geod.Inverse(lat1, lon1, lat2, lon2)
+    return g['azi1'], g['azi2']  # Azimuth berangkat dan pulang
+
+# Tampilan aplikasi Streamlit
+st.title("WebGIS Interaktif: Great Circle Distance (GCD) dalam Globe 3D")
 st.sidebar.header("Cari Lokasi")
-location = st.sidebar.text_input("Masukkan nama lokasi", value="Semarang")  # Default: Semarang
 
-# Mengambil koordinat lokasi yang dicari
+# Pencarian lokasi
+geolocator = Nominatim(user_agent="webgis_app")
+location = st.sidebar.text_input("Masukkan nama lokasi:")
 if location:
-    lat, lon = get_coordinates(location)
-    if lat is not None and lon is not None:
-        st.sidebar.write(f"Lokasi '{location}' ditemukan!")
-        st.sidebar.write(f"Latitude: {lat:.4f}°")
-        st.sidebar.write(f"Longitude: {lon:.4f}°")
-    else:
-        st.sidebar.write(f"Lokasi '{location}' tidak ditemukan.")
+    try:
+        loc = geolocator.geocode(location)
+        if loc:
+            st.sidebar.write(f"Lokasi '{location}' ditemukan:")
+            st.sidebar.write(f"Lintang: {loc.latitude:.4f}°")
+            st.sidebar.write(f"Bujur: {loc.longitude:.4f}°")
+        else:
+            st.sidebar.error("Lokasi tidak ditemukan. Coba nama lain.")
+    except Exception as e:
+        st.sidebar.error(f"Kesalahan: {e}")
 
-# Koordinat titik awal dan akhir
-st.sidebar.header("Masukkan Koordinat Titik Awal dan Akhir")
+# Koordinat Titik Awal
+st.sidebar.subheader("Koordinat Titik Awal")
+start_lat = st.sidebar.number_input("Latitude Awal (°)", min_value=-90.0, max_value=90.0, value=6.20889)
+start_lon = st.sidebar.number_input("Longitude Awal (°)", min_value=-180.0, max_value=180.0, value=106.82750)
 
-start_lat = st.sidebar.number_input("Latitude Titik Awal", min_value=-90.0, max_value=90.0, value=6.20889)
-start_lon = st.sidebar.number_input("Longitude Titik Awal", min_value=-180.0, max_value=180.0, value=106.82750)
-end_lat = st.sidebar.number_input("Latitude Titik Akhir", min_value=-90.0, max_value=90.0, value=35.50000)
-end_lon = st.sidebar.number_input("Longitude Titik Akhir", min_value=-180.0, max_value=180.0, value=100.00000)
+# Koordinat Titik Akhir
+st.sidebar.subheader("Koordinat Titik Akhir")
+end_lat = st.sidebar.number_input("Latitude Akhir (°)", min_value=-90.0, max_value=90.0, value=35.50000)
+end_lon = st.sidebar.number_input("Longitude Akhir (°)", min_value=-180.0, max_value=180.0, value=100.00000)
 
-# Sudut berangkat dan pulang
-st.sidebar.subheader("Sudut Berangkat dan Pulang")
-azimuth_depart = st.sidebar.number_input("Sudut Berangkat (°)", min_value=-180.0, max_value=180.0, value=89.75)
-azimuth_return = st.sidebar.number_input("Sudut Pulang (°)", min_value=-180.0, max_value=180.0, value=131.33)
+# Tombol Hitung
+if st.sidebar.button("Hitung"):
+    # Menghitung lintasan, jarak, dan azimuth
+    path = calculate_great_circle_path(start_lat, start_lon, end_lat, end_lon)
+    distance = calculate_great_circle_distance(start_lat, start_lon, end_lat, end_lon)
+    azimuth_depart, azimuth_return = calculate_azimuth(start_lat, start_lon, end_lat, end_lon)
+    
+    # Pastikan azimuth positif
+    azimuth_depart = azimuth_depart % 360
+    azimuth_return = azimuth_return % 360
 
-# Menampilkan Globe 3D
-view_state = pdk.ViewState(
-    latitude=0,   # Titik tengah globe
-    longitude=0,
-    zoom=1,       # Level zoom untuk globe
-    pitch=45,     # Tilt untuk efek 3D
-    bearing=0     # Putar globe
-)
+    st.write(f"Jarak antara titik awal dan akhir adalah: **{distance:.2f} km**")
+    st.write(f"Sudut berangkat: **{azimuth_depart:.2f}°**")
+    st.write(f"Sudut pulang: **{azimuth_return:.2f}°**")
 
-# Menambahkan Globe 3D dengan Pydeck
-deck = pdk.Deck(
-    initial_view_state=view_state,
-    map_style="mapbox://styles/mapbox/satellite-v9",  # Style mapbox
-    layers=[]
-)
+    # Data untuk Pydeck
+    points = [
+        {"latitude": start_lat, "longitude": start_lon, "name": "Titik Awal", "azimuth": azimuth_depart},
+        {"latitude": end_lat, "longitude": end_lon, "name": "Titik Akhir", "azimuth": azimuth_return}
+    ]
 
-# Menampilkan globe 3D di Streamlit
-st.pydeck_chart(deck)
+    # Layer Titik (Marker)
+    point_layer = pdk.Layer(
+        "ScatterplotLayer",
+        data=points,
+        get_position="[longitude, latitude]",
+        get_fill_color=[255, 0, 0, 160],
+        get_radius=50000,
+        pickable=True,
+    )
 
-# Menampilkan informasi tentang titik awal dan akhir
-st.write(f"**Koordinat Titik Awal**: Latitude {start_lat:.4f}°, Longitude {start_lon:.4f}°")
-st.write(f"**Koordinat Titik Akhir**: Latitude {end_lat:.4f}°, Longitude {end_lon:.4f}°")
+    # Menambahkan simbol pin untuk titik awal dan akhir
+    pin_layer = pdk.Layer(
+        "IconLayer",
+        data=points,
+        get_position="[longitude, latitude]",
+        get_icon_size=5,
+        get_icon_anchor=[0.5, 1],
+        icon_data={"url": "https://raw.githubusercontent.com/visgl/deck.gl-data/master/website/icon-location.svg"},
+        pickable=True
+    )
 
-st.write(f"**Sudut Berangkat**: {azimuth_depart:.2f}°")
-st.write(f"**Sudut Pulang**: {azimuth_return:.2f}°")
+    # Layer Lintasan (Path)
+    path_layer = pdk.Layer(
+        "PathLayer",
+        data=[{"path": path}],
+        get_path="path",
+        get_width=3,
+        get_color=[0, 255, 0],
+        width_min_pixels=2,
+    )
 
-# Menambahkan Pin untuk Titik Awal dan Titik Akhir ke Globe
-marker_layer = pdk.Layer(
-    "ScatterplotLayer",
-    data=[{"position": [start_lon, start_lat], "color": [0, 255, 0], "radius": 1000},  # Titik Awal (hijau)
-          {"position": [end_lon, end_lat], "color": [255, 0, 0], "radius": 1000}],  # Titik Akhir (merah)
-    get_position="position",
-    get_color="color",
-    get_radius="radius",
-    pickable=True
-)
+    # Map dengan efek Elevasi 3D
+    terrain_layer = pdk.Layer(
+        "TerrainLayer",
+        data=[],
+        elevation_scale=50,  # Skala elevasi untuk efek 3D
+        get_position="[longitude, latitude]",
+        get_elevation=0,
+        pickable=True
+    )
 
-# Menambahkan layer untuk garis lintasan
-path_layer = pdk.Layer(
-    "PathLayer",
-    data=[{"coordinates": [[start_lon, start_lat], [end_lon, end_lat]], "color": [0, 255, 0], "width": 3}],
-    get_color="color",
-    get_width="width",
-    width_scale=1,
-    pickable=True
-)
+    # Globe Map View dengan elevasi 3D
+    view_state = pdk.ViewState(latitude=(start_lat + end_lat) / 2, longitude=(start_lon + end_lon) / 2, zoom=2, pitch=60)
 
-# Memasukkan layer ke dalam deck dan menampilkan
-deck.layers = [marker_layer, path_layer]
-st.pydeck_chart(deck)
+    # Pydeck Map
+    r = pdk.Deck(
+        layers=[point_layer, pin_layer, path_layer, terrain_layer],
+        initial_view_state=view_state,
+        map_style="mapbox://styles/mapbox/satellite-v9",
+        tooltip={"text": "{name}\nKoordinat: {latitude:.4f}, {longitude:.4f}\nAzimuth: {azimuth:.2f}°"}
+    )
 
-# Menambahkan deskripsi peta
-st.markdown("""
-Peta ini menampilkan globe 3D dengan dua titik (titik awal dan akhir), serta lintasan antara kedua titik tersebut.
-""")
+    # Tampilkan peta
+    st.pydeck_chart(r)
