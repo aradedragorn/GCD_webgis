@@ -22,6 +22,15 @@ def calculate_great_circle_distance(lat1, lon1, lat2, lon2):
     g = geod.Inverse(lat1, lon1, lat2, lon2)
     return g['s12'] / 1000  # dalam kilometer
 
+@st.cache_data
+def calculate_angle_between_points(lat1, lon1, lat2, lon2):
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+    delta_lon = lon2 - lon1
+    x = math.cos(lat2) * math.sin(delta_lon)
+    y = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(delta_lon)
+    angle = math.degrees(math.atan2(x, y))
+    return angle % 360
+
 # Tampilan aplikasi Streamlit
 st.title("WebGIS Interaktif: Great Circle Distance (GCD) dalam Globe 3D")
 st.sidebar.header("Cari Lokasi")
@@ -51,11 +60,13 @@ end_lon = st.sidebar.number_input("Longitude Akhir (°)", min_value=-180.0, max_
 
 # Tombol Hitung
 if st.sidebar.button("Hitung"):
-    # Menghitung lintasan dan jarak
+    # Menghitung lintasan, jarak, dan sudut
     path = calculate_great_circle_path(start_lat, start_lon, end_lat, end_lon)
     distance = calculate_great_circle_distance(start_lat, start_lon, end_lat, end_lon)
+    angle = calculate_angle_between_points(start_lat, start_lon, end_lat, end_lon)
 
     st.write(f"Jarak antara titik awal dan akhir adalah: **{distance:.2f} km**")
+    st.write(f"Sudut yang dibentuk antara kedua titik: **{angle:.2f}°**")
 
     # Data untuk Pydeck
     points = [
