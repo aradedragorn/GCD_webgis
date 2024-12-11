@@ -32,7 +32,7 @@ def calculate_azimuth(lat1, lon1, lat2, lon2):
     return azimuth_depart, azimuth_return
 
 # Tampilan aplikasi Streamlit
-st.title("WebGIS Interaktif: Great Circle Distance (GCD) dalam Globe 3D")
+st.title("WebGIS: Peta Interaktif Great Circle Distance (GCD)")
 st.sidebar.header("Cari Lokasi")
 
 # Pencarian lokasi
