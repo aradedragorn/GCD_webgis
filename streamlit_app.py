@@ -22,12 +22,6 @@ def calculate_great_circle_distance(lat1, lon1, lat2, lon2):
     g = geod.Inverse(lat1, lon1, lat2, lon2)
     return g['s12'] / 1000  # dalam kilometer
 
-@st.cache_data
-def calculate_azimuth(lat1, lon1, lat2, lon2):
-    geod = Geodesic.WGS84
-    g = geod.Inverse(lat1, lon1, lat2, lon2)
-    return g['azi1'], g['azi2']  # Azimuth berangkat dan pulang
-
 # Tampilan aplikasi Streamlit
 st.title("WebGIS Interaktif: Great Circle Distance (GCD) dalam Globe 3D")
 st.sidebar.header("Cari Lokasi")
@@ -40,8 +34,6 @@ if location:
         loc = geolocator.geocode(location)
         if loc:
             st.sidebar.write(f"Lokasi '{location}' ditemukan:")
-            st.sidebar.write(f"Lintang: {loc.latitude:.4f}°")
-            st.sidebar.write(f"Bujur: {loc.longitude:.4f}°")
         else:
             st.sidebar.error("Lokasi tidak ditemukan. Coba nama lain.")
     except Exception as e:
@@ -59,23 +51,16 @@ end_lon = st.sidebar.number_input("Longitude Akhir (°)", min_value=-180.0, max_
 
 # Tombol Hitung
 if st.sidebar.button("Hitung"):
-    # Menghitung lintasan, jarak, dan azimuth
+    # Menghitung lintasan dan jarak
     path = calculate_great_circle_path(start_lat, start_lon, end_lat, end_lon)
     distance = calculate_great_circle_distance(start_lat, start_lon, end_lat, end_lon)
-    azimuth_depart, azimuth_return = calculate_azimuth(start_lat, start_lon, end_lat, end_lon)
-    
-    # Pastikan azimuth positif
-    azimuth_depart = azimuth_depart % 360
-    azimuth_return = azimuth_return % 360
 
     st.write(f"Jarak antara titik awal dan akhir adalah: **{distance:.2f} km**")
-    st.write(f"Sudut berangkat: **{azimuth_depart:.2f}°**")
-    st.write(f"Sudut pulang: **{azimuth_return:.2f}°**")
 
     # Data untuk Pydeck
     points = [
-        {"latitude": start_lat, "longitude": start_lon, "name": "Titik Awal", "azimuth": azimuth_depart},
-        {"latitude": end_lat, "longitude": end_lon, "name": "Titik Akhir", "azimuth": azimuth_return}
+        {"latitude": start_lat, "longitude": start_lon, "name": "Titik Awal"},
+        {"latitude": end_lat, "longitude": end_lon, "name": "Titik Akhir"}
     ]
 
     # Layer Titik (Marker)
@@ -117,7 +102,7 @@ if st.sidebar.button("Hitung"):
         layers=[point_layer, pin_layer, path_layer],
         initial_view_state=view_state,
         map_style="mapbox://styles/mapbox/satellite-v9",
-        tooltip={"text": "{name}\nKoordinat: {latitude:.4f}, {longitude:.4f}\nAzimuth: {azimuth:.2f}°"}
+        tooltip={"text": "{name}"}
     )
 
     # Tampilkan peta
