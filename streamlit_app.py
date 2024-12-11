@@ -2,6 +2,7 @@ import streamlit as st
 import pydeck as pdk
 from geographiclib.geodesic import Geodesic
 from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut
 import math
 
 # Fungsi untuk menghitung lintasan besar
@@ -31,21 +32,39 @@ def calculate_azimuth(lat1, lon1, lat2, lon2):
     return azimuth_depart, azimuth_return
 
 # Tampilan aplikasi Streamlit
-st.title("WebGIS Interactive Map: Great Circle Distance (GCD)")
+st.title("WebGIS Interaktif: Great Circle Distance (GCD) dalam Globe 3D")
 st.sidebar.header("Cari Lokasi")
 
 # Pencarian lokasi
-geolocator = Nominatim(user_agent="webgis_app")
-location = st.sidebar.text_input("Masukkan nama lokasi:")
-if location:
+def geocode_location(query):
     try:
-        loc = geolocator.geocode(location)
-        if loc:
-            st.sidebar.write(f"Lokasi '{location}' ditemukan:")
-        else:
-            st.sidebar.error("Lokasi tidak ditemukan. Coba nama lain.")
+        geolocator = Nominatim(user_agent="webgis_app")
+        location = geolocator.geocode(query, exactly_one=False, timeout=10)
+        if location:
+            return [
+                {
+                    "name": loc.address,
+                    "latitude": loc.latitude,
+                    "longitude": loc.longitude,
+                }
+                for loc in location[:5]
+            ]  # Mengambil hingga 5 hasil teratas
+        return []
+    except GeocoderTimedOut:
+        return []
     except Exception as e:
         st.sidebar.error(f"Kesalahan: {e}")
+        return []
+
+location_query = st.sidebar.text_input("Masukkan nama lokasi:")
+if location_query:
+    results = geocode_location(location_query)
+    if results:
+        st.sidebar.write("Hasil pencarian:")
+        for i, result in enumerate(results):
+            st.sidebar.write(f"{i + 1}. {result['name']} ({result['latitude']:.4f}, {result['longitude']:.4f})")
+    else:
+        st.sidebar.error("Lokasi tidak ditemukan. Coba nama lain.")
 
 # Koordinat Titik Awal
 st.sidebar.subheader("Koordinat Titik Awal")
